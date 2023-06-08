@@ -79,6 +79,45 @@ async function run() {
 
         })
 
+        //Instructor
+        app.get('/instructor', async (req, res) => {
+            const sortPopular = req.query?.sort
+            if (sortPopular === 'popularInstructor') {
+                const pipeline = [
+                    {
+                        $match: {Role : 'instructor'}
+                    },
+                    {
+                        $lookup : {
+                            from: 'ClassCollection',
+                            localField: '_id',
+                            foreignField: 'instructorId',
+                            as: 'classes'
+                        }
+                    },
+                    {
+                        $addFields:{
+                            totalBookedSeats: {
+                                $sum: '$classes.bookedSeats'
+                            }
+                        }
+                    },
+                    {
+                        $sort: {
+                            totalBookedSeats: -1
+                        }
+                    }
+                ]
+                
+                const result = await UserCollection.aggregate(pipeline).toArray()
+                res.send(result);
+            } else {
+                const result = await UserCollection.find({Role: 'instructor'}).toArray()
+                res.send(result);
+            }
+
+        })
+
 
 
         await client.db("admin").command({ ping: 1 });
@@ -92,7 +131,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('Hello World!');
+    res.send('Welcome to TalkTrek!');
 })
 
 app.listen(port, () => {
