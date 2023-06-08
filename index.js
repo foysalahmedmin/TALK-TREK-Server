@@ -42,6 +42,7 @@ async function run() {
         // await client.connect();
         const database = client.db("TalkTrekDB");
         const UserCollection = database.collection("UserCollection");
+        const ClassCollection = database.collection("ClassCollection");
 
         //JWT
         app.post('/jwt', (req, res) => {
@@ -51,19 +52,35 @@ async function run() {
         })
 
         //User
-        app.post('/user', async(req, res) => {
+        app.post('/user', async (req, res) => {
             const user = req.body
             const query = {
                 email: user.email
             }
-            const userExist = await UserCollection.findOne(query) ;
-            if (userExist){
+            const userExist = await UserCollection.findOne(query);
+            if (userExist) {
                 return
-            }else{
+            } else {
                 const result = await UserCollection.insertOne(user);
                 res.send(result);
             }
         })
+
+        //Classes
+        app.get('/classes', async (req, res) => {
+            const sortPopular = req.query?.sort
+            if (sortPopular === 'popularClasses') {
+                const result = await ClassCollection.find().sort({ bookedSeats: -1 }).toArray()
+                res.send(result);
+            } else {
+                const result = await ClassCollection.find().toArray()
+                res.send(result);
+            }
+
+        })
+
+
+
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
