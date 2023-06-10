@@ -3,7 +3,7 @@ const app = express()
 const cors = require('cors');
 require('dotenv').config()
 const jwt = require('jsonwebtoken');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000
 
 app.use(cors())
@@ -43,6 +43,7 @@ async function run() {
         const database = client.db("TalkTrekDB");
         const UserCollection = database.collection("UserCollection");
         const ClassCollection = database.collection("ClassCollection");
+        const SelectedClassCollection = database.collection("SelectedClassCollection");
 
         //JWT
         app.post('/jwt', (req, res) => {
@@ -55,7 +56,7 @@ async function run() {
         app.post('/user', async (req, res) => {
             const user = req.body
             const query = {
-                email: user.email
+                Email: user.email
             }
             const userExist = await UserCollection.findOne(query);
             if (userExist) {
@@ -63,6 +64,19 @@ async function run() {
             } else {
                 const result = await UserCollection.insertOne(user);
                 res.send(result);
+            }
+        })
+        //Student Verify
+        app.get('/user/isStudent/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            if (req.decoded.email !== email) {
+                res.send({ student: false })
+            }
+            const query = { Email: email }
+            const findUser = await UserCollection.findOne(query);
+            if (findUser) {
+                const result = { student: findUser.Role === 'student' };
+                res.send(result)
             }
         })
 
@@ -79,41 +93,44 @@ async function run() {
 
         })
 
+        //Student
+        app.post('/classSelect/:studentEmail', verifyJWT, async (req, res) => {
+            const selectedClass = req.body
+            const email = req.params.studentEmail;
+            const findSelectedClass = await SelectedClassCollection.findOne({ classId: selectedClass.classId })
+            if (req.decoded?.email !== email) {
+                return res.status(401).send({ error: true, message: 'unauthorized access' });
+            }
+            if (findSelectedClass) {
+                return res.send({ message: 'This Class Already Selected' })
+            } else {
+                const result = await SelectedClassCollection.insertOne(selectedClass)
+                res.send(result)
+            }
+        })
+
         //Instructor
-        app.get('/instructor', async (req, res) => {
+        app.get('/instructors', async (req, res) => {
             const sortPopular = req.query?.sort
+            const instructors = await UserCollection.find({ Role: 'instructor' }).toArray()
             if (sortPopular === 'popularInstructor') {
-                const pipeline = [
-                    {
-                        $match: {Role : 'instructor'}
-                    },
-                    {
-                        $lookup : {
-                            from: 'ClassCollection',
-                            localField: '_id',
-                            foreignField: 'instructorId',
-                            as: 'classes'
-                        }
-                    },
-                    {
-                        $addFields:{
-                            totalBookedSeats: {
-                                $sum: '$classes.bookedSeats'
-                            }
-                        }
-                    },
-                    {
-                        $sort: {
-                            totalBookedSeats: -1
-                        }
-                    }
-                ]
-                
-                const result = await UserCollection.aggregate(pipeline).toArray()
+                instructorsWithClasses = await Promise.all(
+                    instructors.map(async(instructor)=>{
+                        const classes = await ClassCollection
+                        .find({_id: {$in: instructor.ApprovedClassesId.map((id)=> new ObjectId(id))}})
+                        .toArray()
+                        const TotalBookedSeats = classes.reduce((total, singleClass) => {
+                            return total + singleClass.bookedSeats
+                        }, 0 );
+                        return {...instructor, TotalBookedSeats}
+                    })
+                )
+                const result = instructorsWithClasses.sort((a, b) => {
+                    return b.TotalBookedSeats - a.TotalBookedSeats
+                })
                 res.send(result);
             } else {
-                const result = await UserCollection.find({Role: 'instructor'}).toArray()
-                res.send(result);
+                res.send(instructors);
             }
 
         })
@@ -137,3 +154,41 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
 })
+
+
+
+
+
+
+
+
+
+
+
+/*
+const pipeline = [
+    {
+        $match: {Role: 'instructor'}
+    },
+    {
+        $lookup: {
+            from: 'ClassCollection',
+            localField: 'ApprovedClassesId',
+            foreignField: '_id',
+            as: 'classes'
+        }
+    },
+    {
+        $addFields: {
+            totalBookedSeats: {
+                    $sum: '$classes.bookedSeats' 
+                }
+        }
+    },
+    {
+        $sort: {
+            totalBookedSeats: -1
+        }
+    }
+]
+*/
