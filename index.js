@@ -51,6 +51,34 @@ async function run() {
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
             res.send({ token })
         })
+        //Verifications
+        const verifyStudent = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = {Email: email}
+            const user = await UserCollection.findOne(query);
+            if (user?.Role !== 'student' ) {
+                return res.status(403).send({ error: true, message : 'Forbidden User'});
+            }
+            next()
+        }
+        const verifyInstructor = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = {Email: email}
+            const user = await UserCollection.findOne(query);
+            if (user?.Role !== 'instructor' ) {
+                return res.status(403).send({ error: true, message : 'Forbidden User'});
+            }
+            next()
+        }
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = {Email: email}
+            const user = await UserCollection.findOne(query);
+            if (user?.Role !== 'admin' ) {
+                return res.status(403).send({ error: true, message : 'Forbidden User'});
+            }
+            next()
+        }
 
         //User
         app.post('/user', async (req, res) => {
@@ -122,19 +150,26 @@ async function run() {
         })
 
         //Student
-        app.post('/classSelect/:studentEmail', verifyJWT, async (req, res) => {
+        app.post('student/selectClass/:email', verifyJWT, verifyStudent, async (req, res) => {
             const selectedClass = req.body
-            const email = req.params.studentEmail;
-            const findSelectedClass = await SelectedClassCollection.findOne({ classId: selectedClass.classId })
-            if (req.decoded?.email !== email) {
-                return res.status(401).send({ error: true, message: 'unauthorized access' });
-            }
+            const email = req.params.email;
+            const findSelectedClass = await SelectedClassCollection.findOne({ classId: selectedClass.classId });
             if (findSelectedClass) {
                 return res.send({ message: 'This Class Already Selected' })
             } else {
                 const result = await SelectedClassCollection.insertOne(selectedClass)
                 res.send(result)
             }
+        })
+
+        app.get('/student/selectedClasses/:email', verifyJWT, verifyStudent, async (req, res) => {
+            const email = req.params.email;
+            if (req.decoded.email !== email) {
+                return res.status(401).send({ error: true, message: 'unauthorized access' });
+            }
+            const query = { studentEmail: email }
+            const result = await SelectedClassCollection.find(query).toArray();
+            res.send(result)
         })
 
         //Instructor
