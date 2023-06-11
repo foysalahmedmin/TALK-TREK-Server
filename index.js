@@ -80,6 +80,34 @@ async function run() {
             }
         })
 
+        //Instructor Verify
+        app.get('/user/isInstructor/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            if (req.decoded.email !== email) {
+                res.send({ instructor: false })
+            }
+            const query = { Email: email }
+            const findUser = await UserCollection.findOne(query);
+            if (findUser) {
+                const result = { instructor: findUser.Role === 'instructor' };
+                res.send(result)
+            }
+        })
+
+        //Admin Verify
+        app.get('/user/isAdmin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            if (req.decoded.email !== email) {
+                res.send({ admin: false })
+            }
+            const query = { Email: email }
+            const findUser = await UserCollection.findOne(query);
+            if (findUser) {
+                const result = { admin: findUser.Role === 'admin' };
+                res.send(result)
+            }
+        })
+
         //Classes
         app.get('/classes', async (req, res) => {
             const sortPopular = req.query?.sort
