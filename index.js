@@ -214,7 +214,18 @@ async function run() {
             if(findEnrolledClassClassInSelectedClass){
                 const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
             }
+            const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: -1, availableSeats: 1}})
             const result = await EnrolledClassCollection.insertOne(enrolledClass)
+            res.send(result)
+        })
+
+        app.get('/student/enrolledClasses/:email', verifyJWT, verifyStudent, async (req, res) => {
+            const email = req.params.email;
+            if (req.decoded.email !== email) {
+                return res.status(401).send({ error: true, message: 'Unauthorized access' });
+            }
+            const query = { studentEmail: email }
+            const result = await EnrolledClassCollection.find(query).toArray();
             res.send(result)
         })
 
