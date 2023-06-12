@@ -46,6 +46,7 @@ async function run() {
         const ClassCollection = database.collection("ClassCollection");
         const SelectedClassCollection = database.collection("SelectedClassCollection");
         const EnrolledClassCollection = database.collection("EnrolledClassCollection");
+        const PaymentHistory = database.collection("PaymentHistory");
 
         //JWT
         app.post('/jwt', (req, res) => {
@@ -208,13 +209,14 @@ async function run() {
         })
 
         app.post('/student/enrolledClass/:email', verifyJWT, verifyStudent, async (req, res) => {
-            const enrolledClass = req.body
+            const {enrolledClass, paymentInfo} = req.body
             const email = req.params.email;
             const findEnrolledClassClassInSelectedClass = await SelectedClassCollection.findOne({ studentEmail: email, classId: enrolledClass.classId });
             if(findEnrolledClassClassInSelectedClass){
                 const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
             }
             const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: -1, availableSeats: 1}})
+            const paymentHistoryInsert = PaymentHistory.insertOne(paymentInfo)
             const result = await EnrolledClassCollection.insertOne(enrolledClass)
             res.send(result)
         })
