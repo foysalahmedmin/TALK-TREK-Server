@@ -142,10 +142,10 @@ async function run() {
         app.get('/classes', async (req, res) => {
             const sortPopular = req.query?.sort
             if (sortPopular === 'popularClasses') {
-                const result = await ClassCollection.find().sort({ bookedSeats: -1 }).toArray()
+                const result = await ClassCollection.find({status: 'approved'}).sort({ bookedSeats: -1 }).toArray()
                 res.send(result);
             } else {
-                const result = await ClassCollection.find().toArray()
+                const result = await ClassCollection.find({status: 'approved'}).toArray()
                 res.send(result);
             }
 
@@ -156,8 +156,11 @@ async function run() {
             const selectedClass = req.body
             const email = req.params.email;
             const findSelectedClass = await SelectedClassCollection.findOne({ studentEmail: email, classId: selectedClass.classId });
+            const findEnrolledClass = await EnrolledClassCollection.findOne({ studentEmail: email, classId: selectedClass.classId });
             if (findSelectedClass) {
                 return res.send({ message: 'This Class Already Selected' })
+            } else if (findEnrolledClass) {
+                return res.send({ message: 'This Class Already Enrolled' })
             } else {
                 const result = await SelectedClassCollection.insertOne(selectedClass)
                 res.send(result)
@@ -166,25 +169,25 @@ async function run() {
 
         app.post("/create-payment-intent", async (req, res) => {
             const { price } = req.body;
-            const amount = price * 100; 
+            const amount = price * 100;
             const paymentIntent = await stripe.paymentIntents.create({
-              amount: amount,
-              currency: "usd",
-              automatic_payment_methods: {
-                enabled: true,
-              },
+                amount: amount,
+                currency: "usd",
+                automatic_payment_methods: {
+                    enabled: true,
+                },
             });
-          
+
             res.send({
-              clientSecret: paymentIntent.client_secret,
+                clientSecret: paymentIntent.client_secret,
             });
-          });
+        });
 
         app.delete('/student/deleteClass/:id', verifyJWT, verifyStudent, async (req, res) => {
             const email = req.query?.email
             const id = req.params.id;
             const result = await SelectedClassCollection.deleteOne({ _id: new ObjectId(id) });
-            res.send(result) ;
+            res.send(result);
         })
 
         app.get('/student/selectedClasses/:email', verifyJWT, verifyStudent, async (req, res) => {
@@ -196,12 +199,25 @@ async function run() {
             const result = await SelectedClassCollection.find(query).toArray();
             res.send(result)
         })
+
         app.get('/student/selectedSingleClasses/:id', verifyJWT, verifyStudent, async (req, res) => {
             const email = req.query?.email
             const id = req.params.id;
             const result = await SelectedClassCollection.findOne({ _id: new ObjectId(id) })
             res.send(result)
         })
+
+        app.post('/student/enrolledClass/:email', verifyJWT, verifyStudent, async (req, res) => {
+            const enrolledClass = req.body
+            const email = req.params.email;
+            const findEnrolledClassClassInSelectedClass = await SelectedClassCollection.findOne({ studentEmail: email, classId: enrolledClass.classId });
+            if(findEnrolledClassClassInSelectedClass){
+                const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
+            }
+            const result = await EnrolledClassCollection.insertOne(enrolledClass)
+            res.send(result)
+        })
+
 
         //Instructor
         app.get('/instructors', async (req, res) => {
