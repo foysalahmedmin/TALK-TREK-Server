@@ -45,6 +45,7 @@ async function run() {
         const UserCollection = database.collection("UserCollection");
         const ClassCollection = database.collection("ClassCollection");
         const SelectedClassCollection = database.collection("SelectedClassCollection");
+        const EnrolledClassCollection = database.collection("EnrolledClassCollection");
 
         //JWT
         app.post('/jwt', (req, res) => {
@@ -166,7 +167,6 @@ async function run() {
         app.post("/create-payment-intent", async (req, res) => {
             const { price } = req.body;
             const amount = price * 100; 
-          
             const paymentIntent = await stripe.paymentIntents.create({
               amount: amount,
               currency: "usd",
@@ -181,9 +181,8 @@ async function run() {
           });
 
         app.delete('/student/deleteClass/:id', verifyJWT, verifyStudent, async (req, res) => {
-            const email = req.query.email
+            const email = req.query?.email
             const id = req.params.id;
-            console.log(id, email)
             const result = await SelectedClassCollection.deleteOne({ _id: new ObjectId(id) });
             res.send(result) ;
         })
@@ -191,10 +190,16 @@ async function run() {
         app.get('/student/selectedClasses/:email', verifyJWT, verifyStudent, async (req, res) => {
             const email = req.params.email;
             if (req.decoded.email !== email) {
-                return res.status(401).send({ error: true, message: 'unauthorized access' });
+                return res.status(401).send({ error: true, message: 'Unauthorized access' });
             }
             const query = { studentEmail: email }
             const result = await SelectedClassCollection.find(query).toArray();
+            res.send(result)
+        })
+        app.get('/student/selectedSingleClasses/:id', verifyJWT, verifyStudent, async (req, res) => {
+            const email = req.query?.email
+            const id = req.params.id;
+            const result = await SelectedClassCollection.findOne({ _id: new ObjectId(id) })
             res.send(result)
         })
 
