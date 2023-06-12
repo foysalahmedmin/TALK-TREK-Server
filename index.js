@@ -5,6 +5,7 @@ require('dotenv').config()
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000
+const stripe = require("stripe")(process.env.STRIPE_SK);
 
 app.use(cors())
 app.use(express.json())
@@ -54,28 +55,28 @@ async function run() {
         //Verifications
         const verifyStudent = async (req, res, next) => {
             const email = req.decoded.email;
-            const query = {Email: email}
+            const query = { Email: email }
             const user = await UserCollection.findOne(query);
-            if (user?.Role !== 'student' ) {
-                return res.status(403).send({ error: true, message : 'Forbidden User'});
+            if (user?.Role !== 'student') {
+                return res.status(403).send({ error: true, message: 'Forbidden User' });
             }
             next()
         }
         const verifyInstructor = async (req, res, next) => {
             const email = req.decoded.email;
-            const query = {Email: email}
+            const query = { Email: email }
             const user = await UserCollection.findOne(query);
-            if (user?.Role !== 'instructor' ) {
-                return res.status(403).send({ error: true, message : 'Forbidden User'});
+            if (user?.Role !== 'instructor') {
+                return res.status(403).send({ error: true, message: 'Forbidden User' });
             }
             next()
         }
         const verifyAdmin = async (req, res, next) => {
             const email = req.decoded.email;
-            const query = {Email: email}
+            const query = { Email: email }
             const user = await UserCollection.findOne(query);
-            if (user?.Role !== 'admin' ) {
-                return res.status(403).send({ error: true, message : 'Forbidden User'});
+            if (user?.Role !== 'admin') {
+                return res.status(403).send({ error: true, message: 'Forbidden User' });
             }
             next()
         }
@@ -150,16 +151,41 @@ async function run() {
         })
 
         //Student
-        app.post('student/selectClass/:email', verifyJWT, verifyStudent, async (req, res) => {
+        app.post('/student/selectClass/:email', verifyJWT, verifyStudent, async (req, res) => {
             const selectedClass = req.body
             const email = req.params.email;
-            const findSelectedClass = await SelectedClassCollection.findOne({ classId: selectedClass.classId });
+            const findSelectedClass = await SelectedClassCollection.findOne({ studentEmail: email, classId: selectedClass.classId });
             if (findSelectedClass) {
                 return res.send({ message: 'This Class Already Selected' })
             } else {
                 const result = await SelectedClassCollection.insertOne(selectedClass)
                 res.send(result)
             }
+        })
+
+        app.post("/create-payment-intent", async (req, res) => {
+            const { price } = req.body;
+            const amount = price * 100; 
+          
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount: amount,
+              currency: "usd",
+              automatic_payment_methods: {
+                enabled: true,
+              },
+            });
+          
+            res.send({
+              clientSecret: paymentIntent.client_secret,
+            });
+          });
+
+        app.delete('/student/deleteClass/:id', verifyJWT, verifyStudent, async (req, res) => {
+            const email = req.query.email
+            const id = req.params.id;
+            console.log(id, email)
+            const result = await SelectedClassCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result) ;
         })
 
         app.get('/student/selectedClasses/:email', verifyJWT, verifyStudent, async (req, res) => {
@@ -178,14 +204,14 @@ async function run() {
             const instructors = await UserCollection.find({ Role: 'instructor' }).toArray()
             if (sortPopular === 'popularInstructor') {
                 instructorsWithClasses = await Promise.all(
-                    instructors.map(async(instructor)=>{
+                    instructors.map(async (instructor) => {
                         const classes = await ClassCollection
-                        .find({_id: {$in: instructor.ApprovedClassesId.map((id)=> new ObjectId(id))}})
-                        .toArray()
+                            .find({ _id: { $in: instructor.ApprovedClassesId.map((id) => new ObjectId(id)) } })
+                            .toArray()
                         const TotalBookedSeats = classes.reduce((total, singleClass) => {
                             return total + singleClass.bookedSeats
-                        }, 0 );
-                        return {...instructor, TotalBookedSeats}
+                        }, 0);
+                        return { ...instructor, TotalBookedSeats }
                     })
                 )
                 const result = instructorsWithClasses.sort((a, b) => {
