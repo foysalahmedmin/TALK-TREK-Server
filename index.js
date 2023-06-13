@@ -84,15 +84,15 @@ async function run() {
         }
 
         //User
-        app.post('/user', async (req, res) => {
+        app.post('/user/:email', async (req, res) => {
             const user = req.body
+            const email = req.params.email
             const query = {
-                Email: user.email
+                Email : email
             }
+            console.log(query)
             const userExist = await UserCollection.findOne(query);
-            if (userExist) {
-                return
-            } else {
+            if (!userExist) {
                 const result = await UserCollection.insertOne(user);
                 res.send(result);
             }
@@ -215,7 +215,7 @@ async function run() {
             if(findEnrolledClassClassInSelectedClass){
                 const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
             }
-            const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: -1, availableSeats: 1}})
+            const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: 1, availableSeats: -1}})
             const paymentHistoryInsert = PaymentHistory.insertOne(paymentInfo)
             const result = await EnrolledClassCollection.insertOne(enrolledClass)
             res.send(result)
@@ -228,6 +228,15 @@ async function run() {
             }
             const query = { studentEmail: email }
             const result = await EnrolledClassCollection.find(query).toArray();
+            res.send(result)
+        })
+        app.get('/student/paymentHistory/:email', verifyJWT, verifyStudent, async (req, res) => {
+            const email = req.params.email;
+            if (req.decoded.email !== email) {
+                return res.status(401).send({ error: true, message: 'Unauthorized access' });
+            }
+            const query = { studentEmail: email }
+            const result = await PaymentHistory.find(query).sort({date : -1}).toArray();
             res.send(result)
         })
 
@@ -257,7 +266,7 @@ async function run() {
             }
 
         })
-
+        
 
 
         await client.db("admin").command({ ping: 1 });
