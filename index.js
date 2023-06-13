@@ -279,10 +279,41 @@ async function run() {
                     feedback : feedbackMessage
                 }
             }
-            const result = ClassCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            const result = await ClassCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
             res.send(result);
         })
         
+        app.put('/admin/updateStatus/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id ;
+            const status = req.body.status
+            const instructorEmail = req.body.instructorEmail ;
+            console.log(instructorEmail, status)
+            const instructor = await UserCollection.updateOne({Email : instructorEmail}, {$addToSet: {ApprovedClassesId : id}})
+            const feedbackUpdate = {
+                $set : {
+                    status : status
+                }
+            }
+            const result = await ClassCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            res.send(result);
+        })
+        
+        app.get('/admin/allUsers/:email',verifyJWT, verifyAdmin, async (req, res) =>{
+            const result = await UserCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.put('/admin/updateUserRole/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id ;
+            const role = req.body.role
+            const feedbackUpdate = {
+                $set : {
+                    Role : role
+                }
+            }
+            const result = await UserCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            res.send(result);
+        })
 
 
         await client.db("admin").command({ ping: 1 });
