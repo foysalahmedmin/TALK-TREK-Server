@@ -90,7 +90,6 @@ async function run() {
             const query = {
                 Email : email
             }
-            console.log(query)
             const userExist = await UserCollection.findOne(query);
             if (!userExist) {
                 const result = await UserCollection.insertOne(user);
@@ -265,6 +264,23 @@ async function run() {
                 res.send(instructors);
             }
 
+        })
+
+        //Admin
+        app.get('/admin/allClasses/:email',verifyJWT, verifyAdmin, async (req, res) =>{
+            const result = await ClassCollection.find().toArray();
+            res.send(result)
+        })
+        app.put('/admin/feedback/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id ;
+            const feedbackMessage = req.body.feedback
+            const feedbackUpdate = {
+                $set : {
+                    feedback : feedbackMessage
+                }
+            }
+            const result = ClassCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            res.send(result);
         })
         
 
