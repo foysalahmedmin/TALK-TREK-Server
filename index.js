@@ -138,7 +138,7 @@ async function run() {
             }
         })
 
-        //Classes
+        //Classes Page
         app.get('/classes', async (req, res) => {
             const sortPopular = req.query?.sort
             if (sortPopular === 'popularClasses') {
@@ -147,6 +147,32 @@ async function run() {
             } else {
                 const result = await ClassCollection.find({status: 'approved'}).toArray()
                 res.send(result);
+            }
+
+        })
+
+        //Instructor Page
+        app.get('/instructors', async (req, res) => {
+            const sortPopular = req.query?.sort
+            const instructors = await UserCollection.find({ Role: 'instructor' }).toArray()
+            if (sortPopular === 'popularInstructor') {
+                instructorsWithClasses = await Promise.all(
+                    instructors.map(async (instructor) => {
+                        const classes = await ClassCollection
+                            .find({ _id: { $in: instructor.ApprovedClassesId.map((id) => new ObjectId(id)) } })
+                            .toArray()
+                        const TotalBookedSeats = classes.reduce((total, singleClass) => {
+                            return total + singleClass.bookedSeats
+                        }, 0);
+                        return { ...instructor, TotalBookedSeats }
+                    })
+                )
+                const result = instructorsWithClasses.sort((a, b) => {
+                    return b.TotalBookedSeats - a.TotalBookedSeats
+                })
+                res.send(result);
+            } else {
+                res.send(instructors);
             }
 
         })
@@ -241,30 +267,12 @@ async function run() {
 
 
         //Instructor
-        app.get('/instructors', async (req, res) => {
-            const sortPopular = req.query?.sort
-            const instructors = await UserCollection.find({ Role: 'instructor' }).toArray()
-            if (sortPopular === 'popularInstructor') {
-                instructorsWithClasses = await Promise.all(
-                    instructors.map(async (instructor) => {
-                        const classes = await ClassCollection
-                            .find({ _id: { $in: instructor.ApprovedClassesId.map((id) => new ObjectId(id)) } })
-                            .toArray()
-                        const TotalBookedSeats = classes.reduce((total, singleClass) => {
-                            return total + singleClass.bookedSeats
-                        }, 0);
-                        return { ...instructor, TotalBookedSeats }
-                    })
-                )
-                const result = instructorsWithClasses.sort((a, b) => {
-                    return b.TotalBookedSeats - a.TotalBookedSeats
-                })
-                res.send(result);
-            } else {
-                res.send(instructors);
-            }
-
+        app.get('/instructor/instructorClasses/:email',verifyJWT, verifyAdmin, async (req, res) =>{
+            const email = req.params.email
+            const result = await ClassCollection.find({instructorEmail: email}).toArray();
+            res.send(result)
         })
+        
 
         //Admin
         app.get('/admin/allClasses/:email',verifyJWT, verifyAdmin, async (req, res) =>{
