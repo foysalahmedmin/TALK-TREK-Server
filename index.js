@@ -158,9 +158,7 @@ async function run() {
             if (sortPopular === 'popularInstructor') {
                 instructorsWithClasses = await Promise.all(
                     instructors.map(async (instructor) => {
-                        const classes = await ClassCollection
-                            .find({ _id: { $in: instructor.ApprovedClassesId.map((id) => new ObjectId(id)) } })
-                            .toArray()
+                        const classes = await ClassCollection.find({ instructorEmail: instructor.Email }).toArray()
                         const TotalBookedSeats = classes.reduce((total, singleClass) => {
                             return total + singleClass.bookedSeats
                         }, 0);
@@ -240,7 +238,7 @@ async function run() {
             if(findEnrolledClassClassInSelectedClass){
                 const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
             }
-            const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: 1, availableSeats: -1}})
+            const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: 1, availableSeats: -1}}, {upsert: true})
             const paymentHistoryInsert = PaymentHistory.insertOne(paymentInfo)
             const result = await EnrolledClassCollection.insertOne(enrolledClass)
             res.send(result)
@@ -267,9 +265,26 @@ async function run() {
 
 
         //Instructor
-        app.get('/instructor/instructorClasses/:email',verifyJWT, verifyAdmin, async (req, res) =>{
+        app.post('/instructor/instructorAddClass/:email',verifyJWT, verifyInstructor, async (req, res) =>{
+            const email = req.params.email
+            const postAbleClass = req.body ;
+            const result = await ClassCollection.insertOne(postAbleClass);
+            if(result.insertedId){
+                const classId = result.insertedId.toString()
+                const setClassId = await UserCollection.updateOne({Email: email}, {$addToSet: {ClassesId : classId}}, {upsert: true})
+            }
+            res.send(result)
+        })
+
+        app.get('/instructor/instructorClasses/:email',verifyJWT, verifyInstructor, async (req, res) =>{
             const email = req.params.email
             const result = await ClassCollection.find({instructorEmail: email}).toArray();
+            res.send(result)
+        })
+
+        app.get('/instructor/instructorSingleClasses/:id',verifyJWT, verifyInstructor, async (req, res) =>{
+            const id = req.params.id
+            const result = await ClassCollection.findOne({_id: new ObjectId(id)});
             res.send(result)
         })
         
@@ -296,7 +311,7 @@ async function run() {
             const status = req.body.status
             const instructorEmail = req.body.instructorEmail ;
             console.log(instructorEmail, status)
-            const instructor = await UserCollection.updateOne({Email : instructorEmail}, {$addToSet: {ApprovedClassesId : id}})
+            const instructor = await UserCollection.updateOne({Email : instructorEmail}, {$addToSet: {ApprovedClassesId : id}}, {upsert: true})
             const feedbackUpdate = {
                 $set : {
                     status : status
