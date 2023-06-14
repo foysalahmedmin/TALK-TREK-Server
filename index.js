@@ -88,7 +88,7 @@ async function run() {
             const user = req.body
             const email = req.params.email
             const query = {
-                Email : email
+                Email: email
             }
             const userExist = await UserCollection.findOne(query);
             if (!userExist) {
@@ -142,10 +142,10 @@ async function run() {
         app.get('/classes', async (req, res) => {
             const sortPopular = req.query?.sort
             if (sortPopular === 'popularClasses') {
-                const result = await ClassCollection.find({status: 'approved'}).sort({ bookedSeats: -1 }).toArray()
+                const result = await ClassCollection.find({ status: 'approved' }).sort({ bookedSeats: -1 }).toArray()
                 res.send(result);
             } else {
-                const result = await ClassCollection.find({status: 'approved'}).toArray()
+                const result = await ClassCollection.find({ status: 'approved' }).toArray()
                 res.send(result);
             }
 
@@ -232,13 +232,13 @@ async function run() {
         })
 
         app.post('/student/enrolledClass/:email', verifyJWT, verifyStudent, async (req, res) => {
-            const {enrolledClass, paymentInfo} = req.body
+            const { enrolledClass, paymentInfo } = req.body
             const email = req.params.email;
             const findEnrolledClassClassInSelectedClass = await SelectedClassCollection.findOne({ studentEmail: email, classId: enrolledClass.classId });
-            if(findEnrolledClassClassInSelectedClass){
+            if (findEnrolledClassClassInSelectedClass) {
                 const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
             }
-            const classUpdate = await ClassCollection.updateOne({_id: new ObjectId(enrolledClass.classId)}, {$inc:{bookedSeats: 1, availableSeats: -1}}, {upsert: true})
+            const classUpdate = await ClassCollection.updateOne({ _id: new ObjectId(enrolledClass.classId) }, { $inc: { bookedSeats: 1, availableSeats: -1 } }, { upsert: true })
             const paymentHistoryInsert = PaymentHistory.insertOne(paymentInfo)
             const result = await EnrolledClassCollection.insertOne(enrolledClass)
             res.send(result)
@@ -259,82 +259,99 @@ async function run() {
                 return res.status(401).send({ error: true, message: 'Unauthorized access' });
             }
             const query = { studentEmail: email }
-            const result = await PaymentHistory.find(query).sort({date : -1}).toArray();
+            const result = await PaymentHistory.find(query).sort({ date: -1 }).toArray();
             res.send(result)
         })
 
 
         //Instructor
-        app.post('/instructor/instructorAddClass/:email',verifyJWT, verifyInstructor, async (req, res) =>{
+        app.post('/instructor/instructorAddClass/:email', verifyJWT, verifyInstructor, async (req, res) => {
             const email = req.params.email
-            const postAbleClass = req.body ;
+            const postAbleClass = req.body;
             const result = await ClassCollection.insertOne(postAbleClass);
-            if(result.insertedId){
+            if (result.insertedId) {
                 const classId = result.insertedId.toString()
-                const setClassId = await UserCollection.updateOne({Email: email}, {$addToSet: {ClassesId : classId}}, {upsert: true})
+                const setClassId = await UserCollection.updateOne({ Email: email }, { $addToSet: { ClassesId: classId } }, { upsert: true })
             }
             res.send(result)
         })
+        app.put('/instructor/instructorUpdateClass/:id', verifyJWT, verifyInstructor, async (req, res) => {
+            const id = req.params.id;
+            const updatedClassInfo = req.body
+            const { seats, availableSeats, classDetails, classDuration, startingDate, price } = updatedClassInfo;
+            const updateDoc = {
+                $set: {
+                    seats: seats,
+                    availableSeats: availableSeats,
+                    classDetails: classDetails,
+                    classDuration: classDuration,
+                    startingDate: startingDate,
+                    price: price
+                }
+            }
+            const result = ClassCollection.updateOne({_id: new ObjectId(id)}, updateDoc, {upsert: true})
+            res.send(result)
+        })
 
-        app.get('/instructor/instructorClasses/:email',verifyJWT, verifyInstructor, async (req, res) =>{
+        app.get('/instructor/instructorClasses/:email', verifyJWT, verifyInstructor, async (req, res) => {
             const email = req.params.email
-            const result = await ClassCollection.find({instructorEmail: email}).toArray();
+            const result = await ClassCollection.find({ instructorEmail: email }).toArray();
             res.send(result)
         })
 
-        app.get('/instructor/instructorSingleClasses/:id',verifyJWT, verifyInstructor, async (req, res) =>{
+        app.get('/instructor/instructorSingleClasses/:id', verifyJWT, verifyInstructor, async (req, res) => {
             const id = req.params.id
-            const result = await ClassCollection.findOne({_id: new ObjectId(id)});
+            const result = await ClassCollection.findOne({ _id: new ObjectId(id) });
             res.send(result)
         })
-        
+
 
         //Admin
-        app.get('/admin/allClasses/:email',verifyJWT, verifyAdmin, async (req, res) =>{
+        app.get('/admin/allClasses/:email', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await ClassCollection.find().toArray();
             res.send(result)
         })
         app.put('/admin/feedback/:id', verifyJWT, verifyAdmin, async (req, res) => {
-            const id = req.params.id ;
+            const id = req.params.id;
             const feedbackMessage = req.body.feedback
             const feedbackUpdate = {
-                $set : {
-                    feedback : feedbackMessage
+                $set: {
+                    feedback: feedbackMessage
                 }
             }
-            const result = await ClassCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            const result = await ClassCollection.updateOne({ _id: new ObjectId(id) }, feedbackUpdate, { upsert: true })
             res.send(result);
         })
-        
+
         app.put('/admin/updateStatus/:id', verifyJWT, verifyAdmin, async (req, res) => {
-            const id = req.params.id ;
+            const id = req.params.id;
             const status = req.body.status
-            const instructorEmail = req.body.instructorEmail ;
+            const instructorEmail = req.body.instructorEmail;
             console.log(instructorEmail, status)
-            const instructor = await UserCollection.updateOne({Email : instructorEmail}, {$addToSet: {ApprovedClassesId : id}}, {upsert: true})
+            const instructor = await UserCollection.updateOne({ Email: instructorEmail }, { $addToSet: { ApprovedClassesId: id } }, { upsert: true })
             const feedbackUpdate = {
-                $set : {
-                    status : status
+                $set: {
+                    status: status
                 }
             }
-            const result = await ClassCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            const result = await ClassCollection.updateOne({ _id: new ObjectId(id) }, feedbackUpdate, { upsert: true })
             res.send(result);
         })
-        
-        app.get('/admin/allUsers/:email',verifyJWT, verifyAdmin, async (req, res) =>{
+
+        app.get('/admin/allUsers/:email', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await UserCollection.find().toArray();
             res.send(result)
         })
 
         app.put('/admin/updateUserRole/:id', verifyJWT, verifyAdmin, async (req, res) => {
-            const id = req.params.id ;
+            const id = req.params.id;
             const role = req.body.role
             const feedbackUpdate = {
-                $set : {
-                    Role : role
+                $set: {
+                    Role: role
                 }
             }
-            const result = await UserCollection.updateOne({_id: new ObjectId(id)}, feedbackUpdate, { upsert: true })
+            const result = await UserCollection.updateOne({ _id: new ObjectId(id) }, feedbackUpdate, { upsert: true })
             res.send(result);
         })
 
