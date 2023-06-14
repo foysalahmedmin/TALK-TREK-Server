@@ -233,13 +233,17 @@ async function run() {
 
         app.post('/student/enrolledClass/:email', verifyJWT, verifyStudent, async (req, res) => {
             const { enrolledClass, paymentInfo } = req.body
+            const paymentInfoWithDate = {
+                date: new Date(),
+                ...paymentInfo
+            }
             const email = req.params.email;
             const findEnrolledClassClassInSelectedClass = await SelectedClassCollection.findOne({ studentEmail: email, classId: enrolledClass.classId });
             if (findEnrolledClassClassInSelectedClass) {
                 const result = await SelectedClassCollection.deleteOne({ studentEmail: email, classId: enrolledClass.classId });
             }
             const classUpdate = await ClassCollection.updateOne({ _id: new ObjectId(enrolledClass.classId) }, { $inc: { bookedSeats: 1, availableSeats: -1 } }, { upsert: true })
-            const paymentHistoryInsert = PaymentHistory.insertOne(paymentInfo)
+            const paymentHistoryInsert = await PaymentHistory.insertOne(paymentInfoWithDate)
             const result = await EnrolledClassCollection.insertOne(enrolledClass)
             res.send(result)
         })
@@ -289,7 +293,7 @@ async function run() {
                     price: price
                 }
             }
-            const result = ClassCollection.updateOne({_id: new ObjectId(id)}, updateDoc, {upsert: true})
+            const result = await ClassCollection.updateOne({_id: new ObjectId(id)}, updateDoc, {upsert: true})
             res.send(result)
         })
 
