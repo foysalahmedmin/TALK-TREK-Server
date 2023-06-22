@@ -1,12 +1,11 @@
 const express = require('express')
-const app = express()
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors');
 require('dotenv').config()
 const jwt = require('jsonwebtoken');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const port = process.env.PORT || 5000
 const stripe = require("stripe")(process.env.STRIPE_SK);
-
+const port = process.env.PORT || 5000
+const app = express()
 app.use(cors())
 app.use(express.json())
 
@@ -43,6 +42,8 @@ async function run() {
         // await client.connect();
         const database = client.db("TalkTrekDB");
         const UserCollection = database.collection("UserCollection");
+        const ReviewCollection = database.collection("ReviewCollection");
+        const FollowerCollection = database.collection("FollowerCollection");
         const ClassCollection = database.collection("ClassCollection");
         const SelectedClassCollection = database.collection("SelectedClassCollection");
         const EnrolledClassCollection = database.collection("EnrolledClassCollection");
@@ -96,6 +97,7 @@ async function run() {
                 res.send(result);
             }
         })
+
         //Student Verify
         app.get('/user/isStudent/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
@@ -172,6 +174,43 @@ async function run() {
             } else {
                 res.send(instructors);
             }
+
+        })
+
+        // Following
+
+        app.post('/follow/:email', async (req, res) => {
+            const info = req.body
+            const email = req.params.email
+            const instructorEmail = req.query.instructorEmail;
+            const query = { studentEmail: email, instructorEmail: instructorEmail }
+            const findFollowing = await FollowerCollection.findOne(query);
+            if (!findFollowing) {
+                const result = await FollowerCollection.insertOne(info);
+            } else {
+                const result = await FollowerCollection.deleteOne(query);
+            }
+            const result = await UserCollection.updateOne({ Email: instructorEmail }, { $addToSet: { FollowersEmail: email } }, { upsert: true });
+            res.send(result);
+        })
+
+        app.patch('/unfollow/:email', async (req, res) => {
+            const email = req.params.email
+            const instructorEmail = req.query.instructorEmail;
+            const query = { studentEmail: email, instructorEmail: instructorEmail }
+            const findFollowing = await FollowerCollection.findOne(query);
+            if (findFollowing) {
+                const result = await FollowerCollection.deleteOne(query);
+            }
+            const result = await UserCollection.updateOne({ Email: instructorEmail }, { $pull: { FollowersEmail: email } }, { upsert: false });
+            res.send(result);
+        })
+
+        // Testimonials
+        app.get('/reviews', async (req, res) => {
+            const sortPopular = req.query?.sort
+            const result = await ReviewCollection.find().limit(0, 5).toArray()
+            res.send(result);
 
         })
 
@@ -293,7 +332,7 @@ async function run() {
                     price: price
                 }
             }
-            const result = await ClassCollection.updateOne({_id: new ObjectId(id)}, updateDoc, {upsert: true})
+            const result = await ClassCollection.updateOne({ _id: new ObjectId(id) }, updateDoc, { upsert: true })
             res.send(result)
         })
 
@@ -360,7 +399,7 @@ async function run() {
         })
 
 
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // await client.close();
