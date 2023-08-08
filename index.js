@@ -206,18 +206,29 @@ async function run() {
         })
 
         //ClassDetails
-        app('/singleClass/:id', async (req, res) => {
+        app.get('/singleClass/:id', async (req, res) => {
             const id = req.params.id;
-            const result = await SelectedClassCollection.deleteOne({ _id: new ObjectId(id) });
+            const result = await ClassCollection.findOne({ _id: new ObjectId(id) });
+            res.send(result);
+        })
+
+        app.get('/relatedClass/:classCategory', async (req, res) => {
+            const category = req.params.classCategory ;
+            const result = await ClassCollection.find({classCategory : category}).limit(0, 7).toArray();
+            res.send(result);
+        })
+
+        app.get('/reviews/:id', async (req, res) => {
+            const id = req.params.id;
+            const result = await ReviewCollection.find({classId : id}).toArray();
             res.send(result);
         })
 
         //Testimonials
         app.get('/reviews', async (req, res) => {
-            const sortPopular = req.query?.sort
-            const result = await ReviewCollection.find().limit(0, 5).toArray()
+            const sortPopular = req.query?.sort;
+            const result = await ReviewCollection.find().sort({rating : sortPopular}).limit(0, 5).toArray();
             res.send(result);
-
         })
 
         //Student
