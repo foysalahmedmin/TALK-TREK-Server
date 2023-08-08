@@ -25,7 +25,7 @@ const verifyJWT = (req, res, next) => {
         next();
     })
 }
-
+// c9gWP5vMEVncNyZy
 const uri = `mongodb+srv://${process.env.DB_USER_NAME}:${process.env.DB_PASSWORD}@cluster0.7y3daag.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -178,7 +178,6 @@ async function run() {
         })
 
         // Following
-
         app.post('/follow/:email', async (req, res) => {
             const info = req.body
             const email = req.params.email
@@ -206,7 +205,14 @@ async function run() {
             res.send(result);
         })
 
-        // Testimonials
+        //ClassDetails
+        app('/singleClass/:id', async (req, res) => {
+            const id = req.params.id;
+            const result = await SelectedClassCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result);
+        })
+
+        //Testimonials
         app.get('/reviews', async (req, res) => {
             const sortPopular = req.query?.sort
             const result = await ReviewCollection.find().limit(0, 5).toArray()
